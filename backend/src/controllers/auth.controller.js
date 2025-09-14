@@ -1,6 +1,7 @@
 const userModel = require("../models/user.model");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
+const { json } = require("express");
 
 const registerController = async (req, res) => {
   try {
@@ -53,5 +54,56 @@ const registerController = async (req, res) => {
     });
   }
 };
+const loginController = async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
-module.exports = { registerController };
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "all fields are required",
+      });
+    }
+
+    const user = await userModel.findOne({
+      email: email,
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        message: "Invalid credentials",
+      });
+    }
+
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
+        message: "Invalid credentials",
+      });
+    }
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+
+    return res
+      .status(200)
+      .cookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      })
+      .json({
+        message: "user logged in",
+        user:{id:user._id,email:user.email}
+      });
+  } catch (error) {
+    console.error("error", error);
+    return res.status(500).json({
+      message:"server error"
+    })
+  }
+};
+module.exports = { registerController, loginController };
