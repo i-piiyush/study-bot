@@ -2,6 +2,7 @@ const userModel = require("../models/user.model");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const { json } = require("express");
+const sendEmail = require("../utils/sendEmail");
 
 const registerController = async (req, res) => {
   try {
@@ -34,6 +35,12 @@ const registerController = async (req, res) => {
     });
 
     if (user) {
+      sendEmail({
+        to: user.email,
+        subject: "Welcome to STUDY-BOT!",
+        template: "welcomeEmailtemplate.html",
+      });
+
       return res
         .status(201)
         .cookie("token", token, {
@@ -86,7 +93,6 @@ const loginController = async (req, res) => {
       expiresIn: "7d",
     });
 
-
     return res
       .status(200)
       .cookie("token", token, {
@@ -97,13 +103,13 @@ const loginController = async (req, res) => {
       })
       .json({
         message: "user logged in",
-        user:{id:user._id,email:user.email}
+        user: { id: user._id, email: user.email },
       });
   } catch (error) {
     console.error("error", error);
     return res.status(500).json({
-      message:"server error"
-    })
+      message: "server error",
+    });
   }
 };
 module.exports = { registerController, loginController };
