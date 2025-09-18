@@ -28,12 +28,14 @@ const registerController = async (req, res) => {
       password: hashedPassword,
       email: email,
     });
-
     const payload = user._id;
-    const token = jwt.sign({ id: payload }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
+
+    const verifyToken = jwt.sign({ id: payload }, process.env.JWT_SECRET, {
+      expiresIn: "15m",
     });
 
+    user.verifyToken = verifyToken;
+    user.save();
     if (user) {
       sendEmail({
         to: user.email,
@@ -43,12 +45,6 @@ const registerController = async (req, res) => {
 
       return res
         .status(201)
-        .cookie("token", token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "strict",
-          maxAge: 7 * 24 * 60 * 60 * 1000,
-        })
         .json({
           message: "user registed sucessfully",
         });
@@ -112,4 +108,58 @@ const loginController = async (req, res) => {
     });
   }
 };
-module.exports = { registerController, loginController };
+const verifyController = async (req, res) => {
+  try {
+    const token = req.query.token;
+
+    if (!token) {
+      return res.status(401).json({
+        message: "Unauthorized token, no token found",
+      });
+    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await userModel.findById(decoded.id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "no user found",
+      });
+    }
+    user.isVerified = true;
+    user.verifyToken = null;
+    await user.save();
+    const payload = user.id;
+    const authtoken = jwt.sign({ id: payload }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    return res
+      .status(200)
+      .cookie("token", authtoken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      })
+      .json({
+        message: "user verified",
+        user: {
+          name: user.name,
+          isVerified: user.isVerified,
+          token: user.verifyToken,
+        },
+      });
+  } catch (error) {
+    console.log(error);
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({
+        message: "Token expired",
+      });
+    }
+    return res.status(401).json({
+      message: "invalid token",
+    });
+  }
+};
+module.exports = { registerController, loginController, verifyController };
