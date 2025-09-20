@@ -1,7 +1,6 @@
 const userModel = require("../models/user.model");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-const { json } = require("express");
 const sendEmail = require("../utils/sendEmail");
 
 const registerController = async (req, res) => {
@@ -122,6 +121,8 @@ const verifyController = async (req, res) => {
     const user = await userModel.findById(decoded.id);
 
     if (!user) {
+      console.log(decoded);
+      
       return res.status(404).json({
         message: "no user found",
       });
